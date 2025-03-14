@@ -1,33 +1,39 @@
-const express = require("express");
-const cors = require("cors");
-const app = express();
-const mongoose = require('mongoose');
-
 require("dotenv").config();
-const port = process.env.PORT || 5000;
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const http = require("http");
+const socketIo = require("socket.io");
 
-// middle ware:
+const authRoutes = require("./router/authRoutes");
+const postRoutes = require("./router/postRoutes");
+const userRoutes = require("./router/userRoutes");
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, { cors: { origin: "*" } });
+
 app.use(cors());
 app.use(express.json());
 
-const dbUser = process.env.DB_USER;
-const dbPass = process.env.DB_PASS;
-const mongodbUri = `mongodb+srv://${dbUser}:${dbPass}@cluster0.hdebc.mongodb.net/coltonPropertyDB?retryWrites=true&w=majority&appName=Cluster0`;
-
 mongoose
-  .connect(mongodbUri)
+  .connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected successfully'))
   .catch((error) => console.error('MongoDB connection error:', error));
 
-const authRoutes = require('./router/authRoutes');
+app.use("/api/auth", authRoutes);
+app.use("/api/posts", postRoutes);
+app.use("/api/users", userRoutes);
 
-app.use('/api/auth', authRoutes);
-
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+  socket.on("send_notification", (data) => {
+    io.emit(`notification_${data.userId}`, data.message);
+  });
+});
 
 app.get("/", (req, res) => {
-  res.send("MVP network is running...");
+  res.send("Sociogram server is running...");
 });
 
-app.listen(port, (req, res) => {
-  console.log(`MVP network is running on port: ${port}`);
-});
+server.listen(5000, () => console.log("Server running on port 5000"));
